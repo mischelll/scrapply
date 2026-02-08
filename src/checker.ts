@@ -1,5 +1,9 @@
-import { chromium, Browser, Page } from "playwright";
+import { Browser, Page } from "playwright";
+import { chromium } from 'playwright-extra';  
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';   
 
+
+chromium.use(StealthPlugin());
 export interface WebsiteCheckResult {
   isAccessible: boolean;
   statusCode: number | null;
@@ -7,16 +11,21 @@ export interface WebsiteCheckResult {
   error: string | null;
 }
 
-export class WebsiteChecker {
-  private browser: Browser | null = null;
-
-  async initialize() {
-    this.browser = await chromium.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
-    console.log("Browser initialized");
-  }
+export class WebsiteChecker {                                                                                                                                                    
+  private browser: Browser | null = null;                                                                                                                                        
+                                                                                                                                                                                 
+  async initialize() {                                                                                                                                                           
+    this.browser = await chromium.launch({                                                                                                                                       
+      headless: true,                                                                                                                                                            
+      args: [                                                                                                                                                                    
+        '--no-sandbox',                                                                                                                                                          
+        '--disable-setuid-sandbox',                                                                                                                                              
+        '--disable-blink-features=AutomationControlled',                                                                                                                         
+      ],                                                                                                                                                                         
+    });                                                                                                                                                                          
+                                                                                                                                                                                 
+    console.log('Browser initialized with stealth mode');                                                                                                                        
+  }   
 
   async checkWebsite(url: string): Promise<WebsiteCheckResult> {
     if (!this.browser) {

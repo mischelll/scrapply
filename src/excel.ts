@@ -92,69 +92,86 @@ export async function readWebsitesFromExcel(
   return websites;
 }
 
-export async function writeResultsToExcel(
-  inputPath: string,
-  outputPath: string,
-  results: CheckResult[]
-): Promise<void> {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.readFile(inputPath);
+export interface CheckResult {                                                                                                                                                   
+    website: string;                                                                                                                                                               
+    isActive: boolean;                                                                                                                                                             
+    emailCount: number;                                                                                                                                                            
+    lastEmailDate: string | null;                                                                                                                                                  
+    confidence: string;                                                                                                                                                            
+    reasoning: string;                                                                                                                                                             
+    source: 'milled' | 'search' | 'none';                                                                                                                                          
+    error: string | null;                                                                                                                                                          
+    lastChecked: string;                                                                                                                                                           
+  }                                                                                                                                                                                
+                                                                                                                                                                                   
+  // Update writeResultsToExcel function                                                                                                                                           
+  export async function writeResultsToExcel(                                                                                                                                       
+    inputPath: string,                                                                                                                                                             
+    outputPath: string,                                                                                                                                                            
+    results: CheckResult[]                                                                                                                                                         
+  ): Promise<void> {                                                                                                                                                               
+    const workbook = new ExcelJS.Workbook();                                                                                                                                       
+    await workbook.xlsx.readFile(inputPath);                                                                                                                                       
+                                                                                                                                                                                   
+    const worksheet = workbook.worksheets[0];  
+    if(!worksheet) return;                                                                                                                                    
+                                                                                                                                                                                   
+    // Find the Website column                                                                                                                                                     
+    const headerRow = worksheet.getRow(1);                                                                                                                                         
+    let websiteColIndex: number | null = null;                                                                                                                                     
+                                                                                                                                                                                   
+    headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {                                                                                                             
+      const cellValue = extractTextFromCell(cell) || '';                                                                                                                           
+      if (cellValue.toLowerCase().trim() === 'website') {                                                                                                                          
+        websiteColIndex = colNumber;                                                                                                                                               
+      }                                                                                                                                                                            
+    });                                                                                                                                                                            
+                                                                                                                                                                                   
+    if (!websiteColIndex) {                                                                                                                                                        
+      throw new Error('Website column not found when writing results');                                                                                                            
+    }                                                                                                                                                                              
+                                                                                                                                                                                   
+    // Add headers for new columns                                                                                                                                                 
+    const startCol = websiteColIndex + 1;                                                                                                                                          
+                                                                                                                                                                                   
+    worksheet.getCell(1, startCol).value = 'Active Status';                                                                                                                        
+    worksheet.getCell(1, startCol + 1).value = 'Email Count';                                                                                                                      
+    worksheet.getCell(1, startCol + 2).value = 'Last Email Date';                                                                                                                  
+    worksheet.getCell(1, startCol + 3).value = 'Confidence';                                                                                                                       
+    worksheet.getCell(1, startCol + 4).value = 'Source';                                                                                                                           
+    worksheet.getCell(1, startCol + 5).value = 'Reasoning';                                                                                                                        
+    worksheet.getCell(1, startCol + 6).value = 'Error';                                                                                                                            
+    worksheet.getCell(1, startCol + 7).value = 'Last Checked';                                                                                                                     
+                                                                                                                                                                                   
+    // Write results                                                                                                                                                               
+    let currentResultIndex = 0;                                                                                                                                                    
+                                                                                                                                                                                   
+    worksheet.eachRow((row, rowNumber) => {                                                                                                                                        
+      if (rowNumber === 1) return; // Skip header                                                                                                                                  
+                                                                                                                                                                                   
+      const cell = row.getCell(websiteColIndex!);                                                                                                                                  
+      const website = extractTextFromCell(cell);                                                                                                                                   
+                                                                                                                                                                                   
+      if (website && currentResultIndex < results.length) {                                                                                                                        
+        const result = results[currentResultIndex];    
 
-  const worksheet = workbook.worksheets[0];
-  if (!worksheet) return;
-
-  // Find the Website column again
-  const headerRow = worksheet.getRow(1);
-  let websiteColIndex: number | null = null;
-
-  headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
-    const cellValue = extractTextFromCell(cell) || "";
-    if (cellValue.toLowerCase() === "website") {
-      websiteColIndex = colNumber;
-    }
-  });
-
-  if (!websiteColIndex) {
-    throw new Error("Website column not found when writing results");
-  }
-
-  // Add headers for new columns
-  const startCol = websiteColIndex + 1;
-
-  worksheet.getCell(1, startCol).value = "Is Accessible";
-  worksheet.getCell(1, startCol + 1).value = "Status Code";
-  worksheet.getCell(1, startCol + 2).value = "Response Time (ms)";
-  worksheet.getCell(1, startCol + 3).value = "Error";
-  worksheet.getCell(1, startCol + 4).value = "Last Checked";
-
-  // Write results - match by website URL
-  let currentResultIndex = 0;
-
-  worksheet.eachRow((row, rowNumber) => {
-    if (rowNumber === 1) return; // Skip header
-
-    const cell = row.getCell(websiteColIndex!);
-    const website = extractTextFromCell(cell);
-
-    if (website && currentResultIndex < results.length) {
-      const result = results[currentResultIndex];
-      if (!result) return;
-
-      worksheet.getCell(rowNumber, startCol).value = result.isAccessible
-        ? "Yes"
-        : "No";
-      worksheet.getCell(rowNumber, startCol + 1).value = result.statusCode;
-      worksheet.getCell(rowNumber, startCol + 2).value = result.responseTime;
-      worksheet.getCell(rowNumber, startCol + 3).value = result.error || "";
-      worksheet.getCell(rowNumber, startCol + 4).value = result.lastChecked;
-
-      currentResultIndex++;
-    }
-  });
-
-  await workbook.xlsx.writeFile(outputPath);
-  console.log(`\n✓ Results written to ${outputPath}`);
-}
+                                                                                                                                                                                   
+        worksheet.getCell(rowNumber, startCol).value = result?.isActive ? 'Yes' : 'No';                                                                                             
+        worksheet.getCell(rowNumber, startCol + 1).value = result?.emailCount || 0;                                                                                                 
+        worksheet.getCell(rowNumber, startCol + 2).value = result?.lastEmailDate || 'N/A';                                                                                          
+        worksheet.getCell(rowNumber, startCol + 3).value = result?.confidence;                                                                                                      
+        worksheet.getCell(rowNumber, startCol + 4).value = result?.source;                                                                                                          
+        worksheet.getCell(rowNumber, startCol + 5).value = result?.reasoning;                                                                                                       
+        worksheet.getCell(rowNumber, startCol + 6).value = result?.error || '';                                                                                                     
+        worksheet.getCell(rowNumber, startCol + 7).value = result?.lastChecked;                                                                                                     
+                                                                                                                                                                                   
+        currentResultIndex++;                                                                                                                                                      
+      }                                                                                                                                                                            
+    });                                                                                                                                                                            
+                                                                                                                                                                                   
+    await workbook.xlsx.writeFile(outputPath);                                                                                                                                     
+    console.log(`\n✓ Results written to ${outputPath}`);                                                                                                                           
+  }                                                   
 
 function extractTextFromCell(cell: ExcelJS.Cell): string | null {
   const value = cell.value;
